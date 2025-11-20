@@ -1,0 +1,214 @@
+@model IEnumerable<Quanlinhahang_Admin.Models.NhanVien>
+
+@{
+    ViewData["Title"] = "Quản lý nhân viên";
+}
+
+<!-- SweetAlert2 + FontAwesome -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap">
+
+        <!-- Back button -->
+        <a asp-area="Admin" asp-controller="Home" asp-action="Index"
+           class="btn btn-green mb-2">
+            <i class="fa-solid fa-arrow-left"></i> Quay lại trang quản trị
+        </a>
+
+        <!-- Title -->
+        <div class="text-center flex-grow-1 mb-3">
+            <h2 class="fw-bold mb-3">Quản lý nhân viên</h2>
+
+            <a asp-area="Admin" asp-controller="NhanViens" asp-action="Create"
+               class="btn btn-primary fw-semibold">
+                <i class="fa-solid fa-user-plus"></i> Thêm nhân viên
+            </a>
+        </div>
+
+        <!-- Search -->
+        <form method="get" asp-action="Index" class="d-flex align-items-center mb-2">
+
+            <!-- Dropdown search type -->
+            <select name="searchType" class="form-select me-2" style="width:160px;">
+                <option value="id" selected="@(ViewBag.SearchType == "id")">ID nhân viên</option>
+                <option value="phone" selected="@(ViewBag.SearchType == "phone")">Số điện thoại</option>
+            </select>
+
+            <input type="text" name="keyword" value="@ViewBag.Keyword"
+                   placeholder="Nhập từ khóa..."
+                   class="form-control me-2" style="width:200px;">
+
+            <button type="submit" class="btn btn-secondary me-2">
+                <i class="fa fa-search"></i> Tìm
+            </button>
+
+            <a asp-action="Index" class="btn btn-showall fw-semibold">
+                <i class="fa-solid fa-list"></i> Hiện tất cả
+            </a>
+        </form>
+
+    </div>
+
+    <!-- Table -->
+    <table class="table table-bordered table-striped text-center align-middle shadow-sm">
+        <thead class="table-light">
+            <tr>
+                <th>Mã</th>
+                <th>Họ tên</th>
+                <th>SĐT</th>
+                <th>Chức vụ</th>
+                <th>Ngày vào làm</th>
+                <th>Trạng thái</th>
+                <th>Tên đăng nhập</th>
+                <th>Mật khẩu</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="9" class="text-muted">Không có dữ liệu để hiển thị.</td>
+                </tr>
+            }
+            else
+            {
+                foreach (var nv in Model)
+                {
+                    <tr>
+                        <td>@nv.NhanVienID</td>
+                        <td>@nv.HoTen</td>
+                        <td>@nv.SoDienThoai</td>
+                        <td>@nv.ChucVu</td>
+                        <td>@(nv.NgayVaoLam?.ToString("dd/MM/yyyy") ?? "")</td>
+                        <td>@nv.TrangThai</td>
+
+                        <!-- Tên đăng nhập -->
+                        <td>
+                            @if (nv.TaiKhoan != null)
+                            {
+                                @nv.TaiKhoan.TenDangNhap
+                            }
+                            else
+                            {
+                                <span class="text-muted">Không có</span>
+                            }
+                        </td>
+
+                        <!-- Mật khẩu ẩn/hiện -->
+                        <td>
+                            @if (nv.TaiKhoan != null)
+                            {
+                                string spanId = "mk_" + nv.NhanVienID;
+
+                                <span id="@spanId">******</span>
+
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                        onclick="togglePassword('@spanId', '@nv.TaiKhoan.MatKhauHash')">
+                                    👁
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Không có</span>
+                            }
+                        </td>
+
+                        <!-- Actions -->
+                        <td>
+                            <a asp-area="Admin"
+                               asp-controller="NhanViens"
+                               asp-action="Edit"
+                               asp-route-id="@nv.NhanVienID"
+                               asp-route-searchType="@(ViewBag.SearchType ?? "")"
+                               asp-route-keyword="@(ViewBag.Keyword ?? "")"
+                               class="btn btn-warning btn-sm">
+                                <i class="fa-solid fa-pen-to-square"></i> Sửa
+                            </a>
+
+                            <form method="post" asp-action="Delete" asp-route-id="@nv.NhanVienID" style="display:inline;">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="fa-solid fa-trash"></i> Xóa
+                                </button>
+                            </form>
+
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+</div>
+
+<!-- SweetAlert -->
+@if (TempData["error"] != null)
+{
+    <script>
+        Swal.fire({ icon: 'error', title: '@TempData["error"]' });
+    </script>
+}
+
+@if (TempData["success"] != null)
+{
+    <script>
+        Swal.fire({
+            icon: 'success',
+            title: '@TempData["success"]',
+            timer: 1800,
+            showConfirmButton: false
+        });
+    </script>
+}
+
+<script>
+    function togglePassword(id, realPass) {
+        const span = document.getElementById(id);
+        span.innerText = (span.innerText === "******") ? realPass : "******";
+    }
+</script>
+
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .container {
+        background: #fff;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 6px 25px rgba(0,0,0,0.08);
+        max-width: 1200px;
+    }
+
+    .btn-green {
+        background-color: #28a745;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+    }
+
+        .btn-green:hover {
+            background-color: #218838;
+        }
+
+    .btn-showall {
+        background-color: #0d6efd;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 8px;
+    }
+
+        .btn-showall:hover {
+            background-color: #0b5ed7;
+        }
+</style>

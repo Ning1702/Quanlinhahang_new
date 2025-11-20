@@ -1,0 +1,189 @@
+﻿@model IEnumerable<Quanlinhahang_Admin.Models.KhachHang>
+
+@{
+    ViewData["Title"] = "Quản lý khách hàng";
+}
+
+<!-- SweetAlert2 + FontAwesome -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.0/dist/sweetalert2.all.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+<div class="container mt-4">
+    <!-- Thanh tiêu đề + Quay lại + Tìm kiếm -->
+    <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap">
+        <!-- 🔙 Nút quay lại -->
+        <a asp-area="Admin" asp-controller="Home" asp-action="Index"
+           class="btn btn-green mb-2">
+            <i class="fa-solid fa-arrow-left"></i> Quay lại trang quản trị
+        </a>
+
+        <!-- 🏷 Tiêu đề -->
+        <div class="text-center flex-grow-1">
+            <h2 class="fw-bold mb-3">Quản lý khách hàng</h2>
+        </div>
+
+        <!-- 🔍 Ô tìm kiếm SDT -->
+        <form method="get" asp-action="Index" class="d-flex align-items-center mb-2">
+            <input type="text" name="searchPhone" value="@ViewBag.SearchPhone"
+                   class="form-control me-2" placeholder="Nhập SĐT khách hàng..."
+                   style="width: 220px; border-radius: 8px;">
+            <button type="submit" class="btn btn-secondary fw-semibold me-2" style="border-radius:8px;">
+                <i class="fa fa-search"></i> Tìm
+            </button>
+            <a asp-action="Index" class="btn btn-showall fw-semibold">
+                <i class="fa-solid fa-list"></i> Hiện tất cả
+            </a>
+        </form>
+    </div>
+
+    <!-- Bảng danh sách -->
+    <table class="table table-bordered table-striped text-center align-middle shadow-sm">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Họ tên</th>
+                <th>Email</th>
+                <th>SĐT</th>
+                <th>Địa chỉ</th>
+                <th>Hạng thành viên</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="7" class="text-muted">Không có khách hàng nào để hiển thị.</td></tr>
+            }
+            else
+            {
+                foreach (var kh in Model)
+                {
+                    <tr id="row-@kh.KhachHangID">
+                        <td>@kh.KhachHangID</td>
+                        <td>@kh.HoTen</td>
+                        <td>@kh.Email</td>
+                        <td>@kh.SoDienThoai</td>
+                        <td>@kh.DiaChi</td>
+                        <td>@(kh.HangThanhVien?.TenHang ?? "Chưa có hạng")</td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm fw-semibold"
+                                    onclick="confirmDelete(@kh.KhachHangID)">
+                                <i class="fa-solid fa-trash"></i> Xóa
+                            </button>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- ✅ SweetAlert Thông báo -->
+@if (TempData["msg"] != null)
+{
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            Swal.fire({
+                icon: 'info',
+                title: '@TempData["msg"]',
+                showConfirmButton: false,
+                timer: 2000
+            });
+        });
+    </script>
+}
+
+<!-- SweetAlert Xác nhận Xóa -->
+<script>
+    function confirmDelete(id) {
+        Swal.fire({
+            title: 'Xóa khách hàng?',
+            text: 'Bạn có chắc chắn muốn xóa khách hàng này không?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Xóa',
+            cancelButtonText: 'Hủy'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch(`/Admin/KhachHangs/DeleteConfirmed/${id}`, { method: 'POST' })
+                    .then(response => {
+                        if (response.ok) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Đã xóa khách hàng thành công!',
+                                showConfirmButton: false,
+                                timer: 1500
+                            }).then(() => {
+                                window.location.href = '/Admin/KhachHangs/Index';
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Lỗi!',
+                                text: 'Không thể xóa khách hàng. Vui lòng thử lại.'
+                            });
+                        }
+                    });
+            }
+        });
+    }
+</script>
+
+<!-- 🌟 CSS -->
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .container {
+        background: #fff;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
+        max-width: 1200px;
+    }
+
+    h2 {
+        font-size: 28px;
+        color: #333;
+    }
+
+    .btn-green {
+        background-color: #28a745;
+        color: white;
+        font-weight: 600;
+        transition: 0.3s;
+        border: none;
+        padding: 8px 16px;
+    }
+
+        .btn-green:hover {
+            background-color: #218838;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(33,136,56,0.3);
+        }
+
+    .btn-showall {
+        background-color: #0d6efd;
+        color: #fff;
+        font-weight: 600;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        transition: 0.3s;
+    }
+
+        .btn-showall:hover {
+            background-color: #0b5ed7;
+            box-shadow: 0 3px 8px rgba(13,110,253,0.3);
+            transform: translateY(-1px);
+            color: #fff;
+        }
+
+    .btn-danger {
+        font-weight: 600;
+    }
+</style>

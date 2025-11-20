@@ -1,0 +1,140 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Thống kê doanh số";
+}
+<h4>Thống kê doanh số</h4>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- (1) Biểu đồ doanh thu 12 tháng -->
+        <div class="col-12 mb-3">
+            <canvas id="revenueChart" height="120"></canvas>
+        </div>
+
+        <!-- (2) Tổng hợp theo Quý + Cả năm (ngay dưới biểu đồ) -->
+        <div class="col-12 mb-4">
+            <div class="row g-3">
+                <div class="col-md-2 col-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Quý 1</div>
+                            <div id="q1Val" class="fs-5 fw-semibold">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Quý 2</div>
+                            <div id="q2Val" class="fs-5 fw-semibold">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Quý 3</div>
+                            <div id="q3Val" class="fs-5 fw-semibold">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted small">Quý 4</div>
+                            <div id="q4Val" class="fs-5 fw-semibold">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-12">
+                    <div class="card shadow-sm border-warning">
+                        <div class="card-body">
+                            <div class="text-muted small">Tổng doanh thu năm <span id="sumYearLabel"></span></div>
+                            <div id="sumYearVal" class="fs-4 fw-bold text-warning">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- (3) Tỷ lệ KH đã có tài khoản (đặt dưới cùng) -->
+        <div class="col-12">
+            <div class="d-flex flex-column align-items-center">
+                <div class="mb-2 fw-semibold">Tỷ lệ khách hàng đã có tài khoản</div>
+                <div style="max-width:420px;width:100%;">
+                    <canvas id="accountPercentChart"></canvas>
+                </div>
+                <div id="accountInfo" class="mt-2 text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (async function () {
+            // ====== 1) Doanh thu 12 tháng ======
+            const revRes = await fetch('@Url.Action("RevenueLast12Months")');
+            const rev = await revRes.json(); // [{label, value}]
+            const labels = rev.map(x => x.label);
+            const values = rev.map(x => Number(x.value || 0));
+
+            new Chart(document.getElementById('revenueChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Doanh thu (12 tháng)',
+                        data: values,
+                        fill: false,
+                        tension: 0.2,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => Number(v).toLocaleString('vi-VN') }
+                        }
+                    },
+                    plugins: { legend: { display: true } }
+                }
+            });
+
+            // ====== 2) Quý & Năm ======
+            const qRes = await fetch('@Url.Action("RevenueQuarterAndYear")');
+            const q = await qRes.json(); // {year, q1,q2,q3,q4,yearTotal}
+
+            const nf = (n) => Number(n || 0).toLocaleString('vi-VN');
+
+            document.getElementById('q1Val').innerText = nf(q.q1);
+            document.getElementById('q2Val').innerText = nf(q.q2);
+            document.getElementById('q3Val').innerText = nf(q.q3);
+            document.getElementById('q4Val').innerText = nf(q.q4);
+            document.getElementById('sumYearLabel').innerText = q.year ?? '';
+            document.getElementById('sumYearVal').innerText = nf(q.yearTotal);
+
+            // ====== 3) Tỷ lệ KH có tài khoản ======
+            const pRes = await fetch('@Url.Action("CustomerAccountPercent")');
+            const p = await pRes.json(); // { totalKH, coTaiKhoan, percent }
+            const total = Number(p.totalKH || 0);
+            const have  = Number(p.coTaiKhoan || 0);
+            const notHave = Math.max(total - have, 0);
+            const percent = total === 0 ? 0 : Math.round((have * 10000 / total)) / 100;
+
+            document.getElementById('accountInfo').innerText =
+                `Tổng KH: ${total.toLocaleString('vi-VN')} | KH có tài khoản: ${have.toLocaleString('vi-VN')} | Tỷ lệ: ${percent}%`;
+
+            new Chart(document.getElementById('accountPercentChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Có tài khoản', 'Chưa có tài khoản'],
+                    datasets: [{ data: [have, notHave] }]
+                },
+                options: { plugins: { legend: { position: 'right' } } }
+            });
+        })();
+    </script>
+}

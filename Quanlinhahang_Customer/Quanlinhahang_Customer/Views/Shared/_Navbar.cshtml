@@ -1,0 +1,139 @@
+﻿@* Navbar chung cho toàn bộ trang *@
+<nav class="navbar">
+
+    <!-- Logo -->
+    <a asp-controller="Home" asp-action="GioiThieu" class="logo">
+        <img src="~/anh/Logo/LogoChu4.png"
+             alt="Logo Dé Sounté Mounté"
+             class="logo-img">
+    </a>
+
+
+
+    <!-- Nút mở menu trên mobile -->
+    <button class="nav-toggle" id="navToggle">&#9776;</button>
+
+    <!-- Menu chính -->
+    <div class="menu-center-wrapper">
+        <ul class="nav-menu" id="navMenu">
+            <li><a asp-controller="Home" asp-action="GioiThieu">Giới thiệu</a></li>
+            <li><a asp-controller="Home" asp-action="Menu">Thực đơn</a></li>
+            <li><a asp-controller="Home" asp-action="DatBan">Đặt bàn</a></li>
+            <li><a href="#lien-he">Liên hệ</a></li>
+        </ul>
+    </div>
+
+    <!-- Khu user / đăng nhập -->
+    <div class="user-section">
+
+        <button class="login-btn" id="loginBtn">Đăng nhập</button>
+
+        <div class="profile-dropdown" id="profileDropdownContainer" style="display: none;">
+
+            <button class="profile-toggle" id="profileToggleBtn">
+                <img src="~/images/profile-icon.png" alt="Icon" class="profile-icon" />
+                <span id="userGreetingName"></span>
+            </button>
+
+            <div class="dropdown-menu" id="profileDropdownMenu">
+                <ul>
+                    <li><a asp-controller="Account" asp-action="Info">Thông tin tài khoản</a></li>
+                    <li><a asp-controller="Account" asp-action="History">Lịch sử</a></li>
+                    <li><a asp-controller="Account" asp-action="Vouchers">Voucher</a></li>
+                    <li><a href="#" id="logoutLink">Đăng xuất</a></li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</nav>
+
+<div class="modal" id="loginModal">
+    <div class="modal-content">
+        <button class="close-btn" id="closeModal">&times;</button>
+
+        <div class="modal-header">
+            <h2>Đăng nhập</h2>
+            <p>Chào mừng bạn đến với Nhà hàng BTL</p>
+        </div>
+
+        <div id="loginError" class="error-message"></div>
+        <div id="loginSuccess" class="success-message"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Số điện thoại / Email</label>
+                <div class="input-wrapper">
+                    <input type="text" id="username" name="username" placeholder="Nhập SĐT hoặc Email" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Mật khẩu</label>
+                <div class="input-wrapper">
+                    <input type="password" id="password" name="password" placeholder="Nhập mật khẩu" required />
+                    <span class="toggle-password" id="togglePassword">👁</span>
+                </div>
+            </div>
+
+            <div class="form-options">
+                <label class="remember-me">
+                    <input type="checkbox" id="rememberMe" />
+                    <span>Ghi nhớ đăng nhập</span>
+                </label>
+                <a class="forgot-password" id="forgotPasswordLink">Quên mật khẩu?</a>
+            </div>
+
+            <button type="submit" class="submit-btn">Đăng nhập</button>
+
+            <div class="register-link">
+                Chưa có tài khoản?
+                <a asp-controller="Account" asp-action="Dangki" class="btn-link">Đăng ký ngay</a>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="modal" id="resetPasswordModal">
+    <div class="modal-content">
+        <button class="close-btn" id="closeResetModal">&times;</button>
+
+        <div class="modal-header">
+            <h2 id="resetHeader">Khôi phục mật khẩu</h2>
+            <p id="resetSubheader">Bước 1: Nhập Tên đăng nhập của bạn</p>
+        </div>
+
+        <div id="resetError" class="error-message"></div>
+        <div id="resetSuccess" class="success-message"></div>
+
+        <form id="resetStep1Form">
+            <div class="form-group">
+                <label for="resetUsername">Tên đăng nhập</label>
+                <div class="input-wrapper">
+                    <input type="text" id="resetUsername" name="username" placeholder="Nhập tên đăng nhập" required />
+                </div>
+            </div>
+            <button type="submit" class="submit-btn" id="continueBtn">Tiếp tục</button>
+            <div class="register-link">
+                <a id="backToLoginFromReset">← Quay lại Đăng nhập</a>
+            </div>
+        </form>
+
+        <form id="resetStep2Form" style="display:none;">
+            <div class="form-group">
+                <label for="newPassword">Mật khẩu mới</label>
+                <div class="input-wrapper">
+                    <input type="password" id="newPassword" name="newPassword" placeholder="Nhập mật khẩu mới" required />
+                    <span class="toggle-password" id="toggleNewPassword">👁</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="confirmNewPassword">Xác nhận mật khẩu mới</label>
+                <div class="input-wrapper">
+                    <input type="password" id="confirmNewPassword" name="confirmNewPassword" placeholder="Nhập lại mật khẩu mới" required />
+                </div>
+            </div>
+            <button type="submit" class="submit-btn">Đổi mật khẩu</button>
+        </form>
+
+    </div>
+</div>

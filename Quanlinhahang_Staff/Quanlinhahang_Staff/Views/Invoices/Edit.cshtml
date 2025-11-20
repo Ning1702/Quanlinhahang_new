@@ -1,0 +1,807 @@
+﻿@model Quanlinhahang_Staff.Models.ViewModels.InvoiceEditVM
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using Quanlinhahang_Staff.Models
+
+@{
+    var monAn = (List<Quanlinhahang_Staff.Models.MonAn>)ViewBag.MonAn;
+    ViewData["Title"] = $"Sửa hóa đơn #{Model.HoaDonID}";
+
+    bool daThanhToan = (bool)(ViewBag.DaThanhToan ?? false);
+
+    string trangThaiTen = ViewBag.TrangThai as string;
+    bool khongTheSua = daThanhToan;
+
+    int status = ViewBag.Status ?? 0;
+
+    var banPhongDaChon = ((List<BanPhong>)ViewBag.BanPhongs)
+                            .FirstOrDefault(b => b.BanPhongID == Model.BanPhongID);
+    var tenBanDaChon = banPhongDaChon != null ? banPhongDaChon.TenBanPhong : "Không yêu cầu";
+}
+
+<h2 class="mt-3">Hóa đơn #@Model.HoaDonID</h2>
+
+@if (TempData["msg"] != null)
+{
+    <div class="alert alert-success">@TempData["msg"]</div>
+}
+
+<div class="row">
+
+    <!-- ========================================== -->
+    <!-- ============== DANH SÁCH MÓN ============= -->
+    <!-- ========================================== -->
+    <div class="col-md-7">
+        <h5>Danh sách món</h5>
+
+        <table class="table table-bordered" id="tableItems">
+            <thead>
+                <tr>
+                    <th>Tên món</th>
+                    <th style="width:150px;text-align:center">SL</th>
+                    <th class="text-end" style="width:160px">Đơn giá</th>
+                    <th class="text-end">Thành tiền</th>
+                    <th style="width:80px"></th>
+                </tr>
+            </thead>
+
+            <tbody id="itemsBody">
+                @foreach (var i in Model.Items)
+                {
+                    <tr data-id="@i.MonAnID"
+                        data-ten="@i.TenMon"
+                        data-gia="@i.DonGia"
+                        data-sl="@i.SoLuong">
+
+                        <td>@i.TenMon</td>
+
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary px-2 btn-minus">-</button>
+                                <span class="mx-2 fw-bold sl-val">@i.SoLuong</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary px-2 btn-plus">+</button>
+                            </div>
+                        </td>
+
+                        <td class="text-end">@i.DonGia.ToString("#,0")</td>
+
+                        <td class="text-end thanh-tien">
+                            @((i.SoLuong * i.DonGia).ToString("#,0"))
+                        </td>
+
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-all">Xóa</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+
+            <tfoot class="table-light">
+                <tr>
+                    <td colspan="3" class="text-end fw-bold">Tạm tính:</td>
+                    <td class="text-end fw-bold" id="subTotal"></td>
+                    <td></td>
+                </tr>
+
+                <tr>
+                    <td colspan="3" class="text-end">VAT (10%)</td>
+                    <td class="text-end" id="vat"></td>
+                </tr>
+
+                <tr class="h5">
+                    <td colspan="3" class="text-end fw-bold">Thành tiền:</td>
+                    <td class="text-end fw-bold" id="finalTotal"></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- ======================= THÊM MÓN ======================== -->
+        @if (!khongTheSua)
+        {
+            <div class="row g-2 mt-2">
+                <div class="col-md-7">
+                    <select class="form-select" id="addItemSelect">
+                        <option value="">-- Chọn món --</option>
+                        @foreach (var m in monAn)
+                        {
+                            <option value="@m.MonAnID"
+                                    data-ten="@m.TenMon"
+                                    data-gia="@m.DonGia">
+                                @m.TenMon (@m.DonGia.ToString("#,0"))
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <input type="number" id="addItemSL" class="form-control" min="1" value="1" />
+                </div>
+
+                <div class="col-md-2">
+                    <button type="button" id="btnAddItem" class="btn btn-primary w-100">
+                        Thêm
+                    </button>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ============= THÔNG TIN THANH TOÁN ======= -->
+    <!-- ========================================== -->
+
+    <div class="col-md-5">
+        <h5>Thông tin thanh toán</h5>
+
+        <form method="post" asp-action="Save" asp-controller="Invoices" id="paymentForm">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" asp-for="HoaDonID" />
+            <input type="hidden" asp-for="DatBanID" />
+
+            <input type="hidden" asp-for="BanPhongID" id="selectedBanPhongID" />
+
+            <!-- GIỮ STATUS -->
+            <input type="hidden" name="status" value="@status" />
+
+            <fieldset>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Chọn bàn / phòng phục vụ</label>
+                    <div class="input-group">
+                        <input type="text" id="selectedBanPhongName"
+                               class="form-control"
+                               value="@tenBanDaChon" readonly />
+
+                        <button type="button"
+                                class="btn btn-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#banPhongModal"
+                                @(khongTheSua ? "disabled" : "")>
+                            Chọn
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Giảm giá</label>
+                    <input asp-for="GiamGia"
+                           type="number"
+                           min="0"
+                           step="1000"
+                           class="form-control undo-field" />
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Điểm sử dụng</label>
+                    <input asp-for="DiemSuDung"
+                           type="number"
+                           min="0"
+                           class="form-control undo-field" />
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Hình thức thanh toán</label>
+                    <select class="form-select undo-field"
+                            asp-for="HinhThucThanhToan">
+                        <option value="">-- Chọn --</option>
+                        <option>Tiền mặt</option>
+                        <option>Thẻ</option>
+                        <option>QR</option>
+                    </select>
+                </div>
+
+            </fieldset>
+
+            <div class="mt-3 d-flex gap-2">
+
+                <button type="button" class="btn btn-warning" id="btnUndo"
+                        @(khongTheSua ? "disabled" : "")>
+                    Hoàn tác
+                </button>
+
+                <button type="button" class="btn btn-secondary" id="btnRestore"
+                        @(khongTheSua ? "disabled" : "")>
+                    Khôi phục
+                </button>
+
+                <button class="btn btn-success" id="btnSave"
+                        @(khongTheSua ? "disabled" : "")>
+                    Lưu
+                </button>
+
+                <a class="btn btn-dark"
+                   href="@Url.Action("Index", new { status = ViewBag.Status })">
+                    Quay lại
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+<!-- ============================================================
+     POPUP SƠ ĐỒ BÀN — BẢN A (Y HỆT CUSTOMER, ĐẸP NHẤT)
+============================================================ -->
+<div class="modal fade" id="banPhongModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content" style="background:#1a1a1a; color:white; border:1px solid #444;">
+
+            <!-- HEADER -->
+            <div class="modal-header border-secondary">
+                <h4 class="modal-title">Sơ đồ Nhà hàng</h4>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <!-- BODY -->
+            <div class="modal-body" style="padding:0 !important;">
+
+                <!-- =================== KHỐI CHÍNH =================== -->
+                <div class="table-modal-content">
+
+                    <!-- CỬA VÀO CHÍNH -->
+                    <div class="area-entrance">🚪 CỬA VÀO CHÍNH</div>
+
+                    <!-- GRID + CỬA SỔ -->
+                    <div class="map-middle-area">
+
+                        <!-- CỬA SỔ -->
+                        <div class="area-window">
+                            🪟 CỬA SỔ KÍNH (VIEW ĐƯỜNG PHỐ)
+                        </div>
+
+                        <!-- GRID BÀN -->
+                        <div class="table-map-grid" id="banPhongGrid">
+                            <!-- JS Fill -->
+                        </div>
+
+                    </div>
+
+                    <!-- KHU BẾP -->
+                    <div class="area-kitchen">
+                        👨‍🍳 KHU VỰC BẾP & QUẦY BAR
+                    </div>
+
+                </div>
+
+                <!-- =================== CHÚ GIẢI =================== -->
+                <div class="map-legend">
+                    <div class="legend-item">
+                        <span class="legend-color available"></span> Trống
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color occupied"></span> Đã đặt / Bận
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color selected"></span> Đang chọn
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     CSS CHUẨN CUSTOMER CHO POPUP STAFF
+============================================================ -->
+<style>
+
+    /* Modal khối chính */
+    .table-modal-content {
+        width: 100%;
+        max-width: 1200px;
+        background: #1a1a1a;
+        border-radius: 14px;
+        border: 1px solid #333;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 75vh;
+        position: relative;
+    }
+
+    /* Cửa vào */
+    .area-entrance {
+        height: 65px;
+        background: #2b2b2b;
+        border-bottom: 2px solid #444;
+        color: #c59d5f;
+        font-size: 1.25rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        letter-spacing: 1px;
+    }
+
+    /* Khối giữa chứa Grid + Cửa Sổ */
+    .map-middle-area {
+        position: relative;
+        flex: 1;
+    }
+
+    /* Cửa sổ kính */
+    .area-window {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 65px;
+        background: rgba(150, 200, 255, 0.14);
+        border-left: 2px solid #699bb8;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        color: #aee1ff;
+        font-weight: 700;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 15px;
+        pointer-events: none;
+        text-align: center;
+    }
+
+    /* GRID bàn */
+    .table-map-grid {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 65px; /* dành chỗ cho cửa sổ */
+        padding: 24px 45px 24px 24px;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+        gap: 22px;
+        background: #1a1a1a;
+    }
+
+    /* CARD bàn */
+    .table-card {
+        background: #2f2f2f;
+        border: 2px solid #555;
+        border-radius: 14px;
+        padding: 15px 10px;
+        cursor: pointer;
+        transition: 0.18s ease;
+        text-align: center;
+    }
+
+        .table-card.available:hover {
+            border-color: #c59d5f;
+            background: #3c3c3c;
+        }
+
+        .table-card.busy {
+            background: #362121;
+            border-color: #5b2b2b;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .table-card.selected {
+            background: #c59d5f !important; /* nền vàng */
+            border-color: #ffffff !important; /* viền trắng */
+            box-shadow: 0 0 12px rgba(255,255,255,0.7); /* ánh viền */
+            transform: scale(1.06); /* phóng nhẹ */
+            color: #000 !important; /* chữ đen */
+            font-weight: 700; /* chữ đậm */
+        }
+
+        .table-card.selected .table-card-icon svg {
+            fill: #000 !important; /* icon tối như Customer */
+        }
+
+        .table-card.selected .table-card-capacity {
+            color: #222 !important; /* số người màu đậm */
+        }
+
+    /* ICON bàn */
+    .table-card-icon svg {
+        width: 38px;
+        height: 38px;
+        fill: #c59d5f !important;
+        margin-bottom: 8px;
+    }
+
+    /* Tên bàn */
+    .table-card-name {
+        color: #fff;
+        font-weight: 700;
+        font-size: 1rem;
+        margin-bottom: 2px;
+    }
+
+    /* Số người */
+    .table-card-capacity {
+        color: #ccc;
+        font-size: 0.85rem;
+    }
+
+    /* Khu vực bếp */
+    .area-kitchen {
+        height: 65px;
+        background: repeating-linear-gradient(45deg, #333 0px, #333 10px, #444 10px, #444 20px);
+        color: #eee;
+        font-size: 1.05rem;
+        font-weight: 700;
+        border-top: 3px solid #c59d5f;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* CHÚ GIẢI */
+    .map-legend {
+        padding: 14px 0;
+        display: flex;
+        justify-content: center;
+        gap: 22px;
+        background: #1a1a1a;
+        border-top: 1px solid #333;
+    }
+
+    .legend-item {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+        color: #ddd;
+    }
+
+    .legend-color {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+    }
+
+        .legend-color.available {
+            background: #444;
+            border: 1px solid #777;
+        }
+
+        .legend-color.occupied {
+            background: #2a1a1a;
+            border: 1px solid #552222;
+        }
+
+        .legend-color.selected {
+            background: #c59d5f;
+        }
+
+</style>
+
+@section Scripts {
+    <script>
+
+        /* ============================================================
+           1) LẤY DỮ LIỆU BAN ĐẦU TỪ MODEL → originalItems
+        ============================================================ */
+        let originalItems = [];
+        document.querySelectorAll("#itemsBody tr").forEach(tr => {
+            originalItems.push({
+                MonAnID: Number(tr.dataset.id),
+                TenMon: tr.dataset.ten,
+                DonGia: Number(tr.dataset.gia),
+                SoLuong: Number(tr.dataset.sl)
+            });
+        });
+
+        let currentItems = JSON.parse(JSON.stringify(originalItems));
+        let undoStack = [];
+
+
+        /* ============================================================
+           2) RENDER LẠI DANH SÁCH MÓN
+        ============================================================ */
+        function renderItems() {
+            let body = document.getElementById("itemsBody");
+            body.innerHTML = "";
+
+            currentItems.forEach(item => {
+                let thanhTien = item.SoLuong * item.DonGia;
+
+                body.innerHTML += `
+                    <tr data-id="${item.MonAnID}"
+                        data-ten="${item.TenMon}"
+                        data-gia="${item.DonGia}"
+                        data-sl="${item.SoLuong}">
+                        <td>${item.TenMon}</td>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-minus px-2">-</button>
+                                <span class="mx-2 fw-bold sl-val">${item.SoLuong}</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-plus px-2">+</button>
+                            </div>
+                        </td>
+                        <td class="text-end">${item.DonGia.toLocaleString()}</td>
+                        <td class="text-end thanh-tien">${thanhTien.toLocaleString()}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-all">Xóa</button>
+                        </td>
+                    </tr>`;
+            });
+
+            tinhTien();
+        }
+
+
+        /* ============================================================
+           3) TÍNH TIỀN TỰ ĐỘNG
+        ============================================================ */
+        function tinhTien() {
+            let sub = 0;
+            currentItems.forEach(i => sub += i.SoLuong * i.DonGia);
+
+            let vat = sub * 0.10;
+
+            let giam = Number(document.querySelector("[name='GiamGia']").value || 0);
+            let diem = Number(document.querySelector("[name='DiemSuDung']").value || 0);
+
+            let final = sub + vat - giam - diem;
+            if (final < 0) final = 0;
+
+            document.getElementById("subTotal").innerText = sub.toLocaleString();
+            document.getElementById("vat").innerText = vat.toLocaleString();
+            document.getElementById("finalTotal").innerText = final.toLocaleString();
+        }
+
+
+        /* ============================================================
+           4) CLICK TĂNG / GIẢM / XÓA MÓN
+        ============================================================ */
+        document.addEventListener("click", function (e) {
+
+            let row = e.target.closest("tr");
+            if (!row) return;
+
+            let id = Number(row.dataset.id);
+            let item = currentItems.find(x => x.MonAnID === id);
+
+            // GIẢM
+            if (e.target.classList.contains("btn-minus")) {
+                if (item.SoLuong > 1) {
+                    undoStack.push(JSON.stringify(currentItems));
+                    item.SoLuong--;
+                    renderItems();
+                }
+            }
+
+            // TĂNG
+            if (e.target.classList.contains("btn-plus")) {
+                undoStack.push(JSON.stringify(currentItems));
+                item.SoLuong++;
+                renderItems();
+            }
+
+            // XÓA
+            if (e.target.classList.contains("btn-remove-all")) {
+                undoStack.push(JSON.stringify(currentItems));
+                currentItems = currentItems.filter(x => x.MonAnID !== id);
+                renderItems();
+            }
+        });
+
+
+        /* ============================================================
+           5) THÊM MÓN
+        ============================================================ */
+        document.getElementById("btnAddItem")?.addEventListener("click", function () {
+            let select = document.getElementById("addItemSelect");
+            let slInput = document.getElementById("addItemSL");
+
+            if (!select.value) {
+                Swal.fire("Vui lòng chọn món!");
+                return;
+            }
+
+            let id = Number(select.value);
+            let ten = select.options[select.selectedIndex].dataset.ten;
+            let gia = Number(select.options[select.selectedIndex].dataset.gia);
+            let sl = Number(slInput.value);
+
+            undoStack.push(JSON.stringify(currentItems));
+
+            let exist = currentItems.find(x => x.MonAnID === id);
+
+            if (exist) {
+                exist.SoLuong += sl;
+            } else {
+                currentItems.push({
+                    MonAnID: id,
+                    TenMon: ten,
+                    DonGia: gia,
+                    SoLuong: sl
+                });
+            }
+
+            renderItems();
+        });
+
+
+        /* ============================================================
+           6) HOÀN TÁC
+        ============================================================ */
+        document.getElementById("btnUndo").addEventListener("click", function () {
+            if (undoStack.length === 0) {
+                Swal.fire("Không có bước hoàn tác!");
+                return;
+            }
+
+            currentItems = JSON.parse(undoStack.pop());
+            renderItems();
+        });
+
+
+        /* ============================================================
+           7) KHÔI PHỤC VỀ BAN ĐẦU
+        ============================================================ */
+        document.getElementById("btnRestore").addEventListener("click", function () {
+            Swal.fire({
+                title: "Khôi phục hóa đơn?",
+                text: "Dữ liệu hóa đơn sẽ trở về ban đầu!",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Khôi phục",
+                cancelButtonText: "Hủy"
+            }).then(res => {
+                if (res.isConfirmed) {
+                    currentItems = JSON.parse(JSON.stringify(originalItems));
+                    undoStack = [];
+                    renderItems();
+                }
+            });
+        });
+
+
+        /* ============================================================
+           8) LƯU HÓA ĐƠN
+        ============================================================ */
+        document.getElementById("btnSave").addEventListener("click", function (e) {
+            e.preventDefault();
+
+            Swal.fire({
+                title: "Lưu hóa đơn?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Lưu",
+                cancelButtonText: "Hủy"
+            }).then(result => {
+
+                if (result.isConfirmed) {
+
+                    let jsonData = currentItems.map(x => ({
+                        MonAnID: x.MonAnID,
+                        TenMon: x.TenMon,
+                        DonGia: x.DonGia,
+                        SoLuong: x.SoLuong
+                    }));
+
+                    let input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "ItemsJson";
+                    input.value = JSON.stringify(jsonData);
+
+                    document.getElementById("paymentForm").appendChild(input);
+                    document.getElementById("paymentForm").submit();
+                }
+
+            });
+        });
+
+
+        /* ============================================================
+           9) RENDER LẦN ĐẦU
+        ============================================================ */
+        renderItems();
+
+
+        /* ============================================================
+           10) MODAL BÀN — LOAD DS BÀN
+        ============================================================ */
+
+        document.querySelector("[data-bs-target='#banPhongModal']")
+            .addEventListener("click", loadBanPhongStaff);
+
+        function loadBanPhongStaff() {
+            fetch("/Invoices/GetBanPhong")
+                .then(res => res.json())
+                .then(list => renderBanPhongGrid(list));
+        }
+
+
+        /* ============================================================
+           11) RENDER GRID BÀN (UI CUSTOMER)
+        ============================================================ */
+        function renderBanPhongGrid(data) {
+
+            let html = "";
+
+            data.forEach(b => {
+
+                const isAvailable =
+                    b.trangThai === "Trống" ||
+                    b.trangThai === "trong" ||
+                    b.trangThai === "Trong";
+
+                let css = "table-card ";
+                css += isAvailable ? "available" : "busy";
+
+                html += `
+                    <div class="${css}"
+                         data-id="${b.banPhongID}"
+                         data-name="${b.tenBanPhong}"
+                         data-available="${isAvailable}"
+                         data-capacity="${b.soChoNgoi}">
+
+                        <div class="table-card-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M3 10h18v2H3v-2zm2 4h14v6H5v-6zM7 4h10v4H7V4z"/>
+                            </svg>
+                        </div>
+
+                        <div class="table-card-name">${b.tenBanPhong}</div>
+                        <div class="table-card-capacity">${b.soChoNgoi} người</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById("banPhongGrid").innerHTML = html;
+
+            const currentID = document.getElementById("selectedBanPhongID").value;
+
+            if (currentID) {
+                const selectedCard = document.querySelector(
+                    `.table-card[data-id="${currentID}"]`
+                );
+                if (selectedCard && selectedCard.dataset.available === "true") {
+                    selectedCard.classList.add("selected");
+                }
+            }
+        }
+
+
+        /* ============================================================
+           12) CLICK CHỌN BÀN
+        ============================================================ */
+        document.addEventListener("click", function (e) {
+
+            const card = e.target.closest(".table-card");
+            if (!card) return;
+
+            const isAvailable = card.dataset.available === "true";
+
+            if (!isAvailable) {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Bàn đã bận",
+                    text: "Bàn này đang bận hoặc đã có khách!",
+                    confirmButtonColor: "#c59d5f"
+                });
+                return;
+            }
+
+            document.querySelectorAll(".table-card")
+                .forEach(c => c.classList.remove("selected"));
+
+            card.classList.add("selected");
+
+            document.getElementById("selectedBanPhongID").value = card.dataset.id;
+            document.getElementById("selectedBanPhongName").value = card.dataset.name;
+
+            setTimeout(() => {
+                let modal = bootstrap.Modal.getInstance(
+                    document.getElementById('banPhongModal')
+                );
+                modal.hide();
+            }, 200);
+
+        });
+
+    </script>
+}

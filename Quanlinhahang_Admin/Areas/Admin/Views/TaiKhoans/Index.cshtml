@@ -1,0 +1,21 @@
+﻿@model IEnumerable<Quanlinhahang_Admin.Models.TaiKhoan>
+<h4>Danh sách nhân viên</h4>
+<a asp-action="Create" class="btn btn-primary mb-3">+ Thêm nhân viên</a>
+<table class="table table-bordered">
+    <tr><th>ID</th><th>Tên đăng nhập</th><th>Email</th><th>Trạng thái</th><th></th></tr>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>@item.TaiKhoanID</td>
+            <td>@item.TenDangNhap</td>
+            <td>@item.Email</td>
+            <td>@item.TrangThai</td>
+            <td>
+                <a asp-action="Edit" asp-route-id="@item.TaiKhoanID" class="btn btn-sm btn-warning">Sửa</a>
+                <form asp-action="Delete" asp-route-id="@item.TaiKhoanID" method="post" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                </form>
+            </td>
+        </tr>
+    }
+</table>

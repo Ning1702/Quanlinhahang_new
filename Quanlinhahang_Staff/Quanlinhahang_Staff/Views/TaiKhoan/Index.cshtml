@@ -1,0 +1,121 @@
+﻿@model Quanlinhahang_Staff.Models.ViewModels.TaiKhoanStaffVM
+
+@{
+    ViewData["Title"] = "Thông tin tài khoản";
+}
+
+<div class="container mt-4" style="max-width: 650px;">
+    <h3 class="fw-bold mb-4">Thông tin tài khoản</h3>
+
+    <form id="accountForm" method="post" asp-action="CapNhat">
+        <input type="hidden" asp-for="NhanVienID" />
+        <input type="hidden" asp-for="TaiKhoanID" />
+
+        <!-- ========================= THÔNG TIN CÁ NHÂN ========================= -->
+        <div class="card mb-3">
+            <div class="card-header fw-bold">👤 Thông tin cá nhân</div>
+            <div class="card-body">
+
+                <label class="form-label">Họ tên</label>
+                <input asp-for="HoTen" class="form-control form-input" readonly />
+
+                <label class="form-label mt-3">Số điện thoại</label>
+                <input asp-for="SoDienThoai" class="form-control form-input" readonly />
+
+                <label class="form-label mt-3">Chức vụ</label>
+                <input asp-for="ChucVu" class="form-control" readonly />
+            </div>
+        </div>
+
+        <!-- ========================= THÔNG TIN ĐĂNG NHẬP ========================= -->
+        <div class="card mb-3">
+            <div class="card-header fw-bold">🔐 Thông tin đăng nhập</div>
+            <div class="card-body">
+
+                <label class="form-label">Tên đăng nhập</label>
+                <input asp-for="TenDangNhap" class="form-control form-input" readonly />
+
+                <label class="form-label mt-3">Email</label>
+                <input asp-for="Email" class="form-control form-input" readonly />
+
+                <label class="form-label mt-3">Mật khẩu</label>
+                <input asp-for="MatKhauHash" class="form-control form-input" readonly />
+            </div>
+        </div>
+
+        <!-- ========================= BUTTONS ========================= -->
+        <div class="text-center mt-3">
+
+            <!-- Nút chỉ có "Chỉnh sửa" -->
+            <div id="editOnlyWrapper">
+                <button type="button" id="btnEdit" class="btn btn-primary px-4">
+                    Chỉnh sửa
+                </button>
+            </div>
+
+            <!-- Nút Hủy + Cập nhật -->
+            <div id="editButtons" style="display:none; margin-top: 15px;">
+                <button type="button" id="btnCancel" class="btn btn-secondary px-4 me-2">Hủy</button>
+                <button type="submit" id="btnSave" class="btn btn-success px-4">Cập nhật</button>
+            </div>
+
+        </div>
+
+    </form>
+</div>
+
+<!-- ========================= JS ========================= -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const inputs = document.querySelectorAll(".form-input");
+        const original = {};
+
+        // Lưu giá trị ban đầu
+        inputs.forEach(x => original[x.name] = x.value);
+
+        // ---------- Bấm CHỈNH SỬA ----------
+        document.getElementById("btnEdit").addEventListener("click", function () {
+
+            inputs.forEach(x => x.readOnly = false);
+
+            // Ẩn nút Chỉnh sửa
+            document.getElementById("editOnlyWrapper").style.display = "none";
+
+            // Hiện nút Hủy + Cập nhật
+            document.getElementById("editButtons").style.display = "block";
+        });
+
+        // ---------- Bấm HỦY ----------
+        document.getElementById("btnCancel").addEventListener("click", function () {
+
+            inputs.forEach(x => {
+                x.readOnly = true;
+                x.value = original[x.name];
+            });
+
+            // Hiện lại nút chỉnh sửa
+            document.getElementById("editOnlyWrapper").style.display = "block";
+
+            // Ẩn 2 nút Hủy + Cập nhật
+            document.getElementById("editButtons").style.display = "none";
+        });
+    });
+</script>
+
+<!-- ========================= SWEETALERT THÔNG BÁO CẬP NHẬT ========================= -->
+@section Scripts {
+    <script>
+        @if (TempData["update"] != null)
+        {
+                <text>
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Cập nhật thành công!',
+                        text: 'Thông tin tài khoản đã được lưu.',
+                        confirmButtonText: 'Đồng ý'
+                    });
+                </text>
+        }
+    </script>
+}

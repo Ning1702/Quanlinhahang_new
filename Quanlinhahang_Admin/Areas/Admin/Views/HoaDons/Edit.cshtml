@@ -1,0 +1,16 @@
+@model Quanlinhahang_Admin.Models.HoaDon
+<h4>Cập nhật Hóa đơn (VAT & Loại dịch vụ)</h4>
+<form asp-action="Edit" method="post">
+  <input type="hidden" asp-for="HoaDonID"/>
+  <div class="mb-3"><label>VAT (%)</label><input asp-for="VAT" class="form-control" type="number" step="0.01"/></div>
+  <div class="mb-3">
+    <label>Loại dịch vụ</label>
+    <select asp-for="LoaiDichVu" class="form-select">
+      <option value="Tại chỗ">Tại chỗ</option>
+      <option value="Mang về">Mang về</option>
+      <option value="Giao hàng">Giao hàng</option>
+    </select>
+  </div>
+  <button class="btn btn-primary">Lưu</button>
+  <a asp-action="Index" class="btn btn-secondary">Hủy</a>
+</form>

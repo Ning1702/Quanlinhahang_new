@@ -1,0 +1,674 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Quanlinhahang_Customer.Models; // Đảm bảo namespace này chứa Models VÀ ViewModels
+using Quanlinhahang_Customer.Models.ViewModels;
+using System.Security.Cryptography;
+using System.Text;
+
+[Route("Account")]
+public class AccountController : Controller
+{
+    private readonly QuanLyNhaHangContext _context;
+
+    // 1. CONSTRUCTOR
+    public AccountController(QuanLyNhaHangContext context)
+    {
+        _context = context;
+    }
+
+    // ==========================================================
+    // ACTIONS (GET) ĐỂ MỞ CÁC VIEW (TRANG)
+    // ==========================================================
+
+    [HttpGet("Dangki")]
+    public IActionResult Dangki()
+    {
+        return View();
+    }
+
+    [HttpGet("Info")]
+    public IActionResult Info()
+    {
+        return View();
+    }
+
+    [HttpGet("History")]
+    public IActionResult History()
+    {
+        return View();
+    }
+
+    [HttpGet("Vouchers")]
+    public IActionResult Vouchers()
+    {
+        return View();
+    }
+
+    // ==========================================================
+    // API (POST) CHO CHỨC NĂNG ĐĂNG KÝ
+    // ==========================================================
+    [HttpPost("Register")]
+    public async Task<IActionResult> Register([FromBody] RegisterViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+            return BadRequest(new { success = false, message = string.Join(" | ", errors) });
+        }
+        if (await _context.TaiKhoans.AnyAsync(t => t.TenDangNhap == model.Phone))
+        {
+            return Conflict(new { success = false, message = "Số điện thoại này đã được đăng ký." });
+        }
+        if (await _context.KhachHangs.AnyAsync(k => k.SoDienThoai == model.Phone))
+        {
+            return Conflict(new { success = false, message = "Số điện thoại này đã được đăng ký." });
+        }
+
+        var hashedPassword = HashPassword(model.Password);
+
+        using (var transaction = await _context.Database.BeginTransactionAsync())
+        {
+            try
+            {
+                var taiKhoan = new TaiKhoan
+                {
+                    TenDangNhap = model.Phone,
+                    MatKhauHash = hashedPassword,
+                    Email = model.Email,
+                    VaiTro = "Customer",
+                    TrangThai = "Hoạt động"
+                };
+                _context.TaiKhoans.Add(taiKhoan);
+                await _context.SaveChangesAsync();
+
+                var khachHang = new KhachHang
+                {
+                    HoTen = model.FullName,
+                    Email = model.Email,
+                    SoDienThoai = model.Phone,
+                    DiaChi = model.Address,
+                    DiemTichLuy = 0,
+                    HangThanhVienId = 1,
+                    TaiKhoanId = taiKhoan.TaiKhoanId,
+                    NgayTao = DateTime.Now,
+                    TrangThai = "Hoạt động"
+                };
+                _context.KhachHangs.Add(khachHang);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+                return Json(new { success = true, message = "Đăng ký tài khoản thành công! 🎉" });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                string errorMessage = ex.Message + (ex.InnerException != null ? " | Inner Exception: " + ex.InnerException.Message : "");
+                return StatusCode(500, new { success = false, message = errorMessage });
+            }
+        }
+    }
+
+    // ==========================================================
+    // API (POST) CHO CHỨC NĂNG ĐĂNG NHẬP
+    // ==========================================================
+    [HttpPost("Login")]
+    public async Task<IActionResult> Login([FromBody] LoginViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+        }
+
+        TaiKhoan? taiKhoan = null;
+        taiKhoan = await _context.TaiKhoans
+            .FirstOrDefaultAsync(t =>
+                t.TenDangNhap == model.Username ||
+                t.Email == model.Username
+            );
+
+        if (taiKhoan == null)
+        {
+            var khachHang = await _context.KhachHangs
+                .Include(k => k.TaiKhoan) 
+                .FirstOrDefaultAsync(k => k.SoDienThoai == model.Username);
+
+            if (khachHang != null && khachHang.TaiKhoan != null)
+            {
+                taiKhoan = khachHang.TaiKhoan;
+            }
+        }
+        if (taiKhoan == null)
+        {
+            return Unauthorized(new { success = false, message = "Sai tài khoản hoặc mật khẩu." });
+        }
+
+        if (taiKhoan.MatKhauHash != model.Password)
+        {
+            return Unauthorized(new { success = false, message = "Sai tài khoản hoặc mật khẩu." });
+        }
+
+        string fullName = taiKhoan.TenDangNhap;
+
+        if (taiKhoan.VaiTro == "Customer")
+        {
+            var tk = await _context.TaiKhoans
+                .Include(t => t.KhachHangs)
+                .FirstOrDefaultAsync(t => t.TaiKhoanId == taiKhoan.TaiKhoanId);
+
+            var khachHang = tk?.KhachHangs.FirstOrDefault();
+            if (khachHang != null) fullName = khachHang.HoTen;
+        }
+        else if (taiKhoan.VaiTro == "Admin" || taiKhoan.VaiTro == "Staff")
+        {
+            var nhanVien = await _context.NhanViens
+                .FirstOrDefaultAsync(nv => nv.TaiKhoanId == taiKhoan.TaiKhoanId);
+            if (nhanVien != null) fullName = nhanVien.HoTen;
+        }
+
+        var userResponse = new
+        {
+            username = taiKhoan.TenDangNhap,
+            fullName = fullName,
+            role = taiKhoan.VaiTro
+        };
+
+        return Json(new { success = true, user = userResponse });
+    }
+
+    // ==========================================================
+    // API (POST) CHO CHỨC NĂNG QUÊN MẬT KHẨU
+    // ==========================================================
+
+    [HttpPost("CheckUsername")]
+    public async Task<IActionResult> CheckUsername([FromBody] CheckUsernameViewModel model)
+    {
+        if (string.IsNullOrWhiteSpace(model.Username))
+        {
+            return BadRequest(new { success = false, message = "Vui lòng nhập tên đăng nhập." });
+        }
+
+        var taiKhoan = await _context.TaiKhoans
+            .FirstOrDefaultAsync(t => t.TenDangNhap == model.Username);
+
+        if (taiKhoan == null)
+        {
+            return Json(new { success = false, message = "Tên đăng nhập không tồn tại." });
+        }
+        return Json(new { success = true });
+    }
+
+    [HttpPost("ResetPassword")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new { success = false, message = "Mật khẩu mới không hợp lệ." });
+        }
+
+        var taiKhoan = await _context.TaiKhoans
+            .FirstOrDefaultAsync(t => t.TenDangNhap == model.Username);
+
+        if (taiKhoan == null)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy tài khoản để khôi phục." });
+        }
+
+        var newHashedPassword = HashPassword(model.NewPassword);
+        taiKhoan.MatKhauHash = newHashedPassword;
+
+        try
+        {
+            _context.TaiKhoans.Update(taiKhoan);
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, message = "Khôi phục thành công! Vui lòng đăng nhập bằng mật khẩu mới." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = "Lỗi server khi cập nhật mật khẩu." });
+        }
+    }
+
+    // ==========================================================
+    // API (GET/POST) CHO TRANG THÔNG TIN TÀI KHOẢN
+    // ==========================================================
+
+    [HttpGet("GetUserInfo")]
+    public async Task<IActionResult> GetUserInfo([FromQuery] string username)
+    {
+        if (string.IsNullOrEmpty(username))
+        {
+            return BadRequest(new { success = false, message = "Không tìm thấy người dùng." });
+        }
+
+        var khachHang = await _context.KhachHangs
+                                    .Include(k => k.TaiKhoan)
+                                    .FirstOrDefaultAsync(k => k.TaiKhoan != null && k.TaiKhoan.TenDangNhap == username);
+        if (khachHang == null)
+        {
+            var nhanVien = await _context.NhanViens
+                                    .Include(n => n.TaiKhoan)
+                                    .FirstOrDefaultAsync(n => n.TaiKhoan != null && n.TaiKhoan.TenDangNhap == username);
+            if (nhanVien != null)
+            {
+                return Json(new { fullName = nhanVien.HoTen, email = nhanVien.TaiKhoan?.Email, phone = nhanVien.SoDienThoai, address = "N/A" });
+            }
+            return NotFound(new { success = false, message = "Không tìm thấy thông tin." });
+        }
+        return Json(new { fullName = khachHang.HoTen, email = khachHang.Email, phone = khachHang.SoDienThoai, address = khachHang.DiaChi });
+    }
+
+    [HttpPost("UpdateUserInfo")]
+    public async Task<IActionResult> UpdateUserInfo([FromBody] UpdateInfoViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+        }
+        var khachHang = await _context.KhachHangs
+                                    .Include(k => k.TaiKhoan)
+                                    .FirstOrDefaultAsync(k => k.TaiKhoan != null && k.TaiKhoan.TenDangNhap == model.Username);
+
+        if (khachHang == null || khachHang.TaiKhoan == null)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy người dùng để cập nhật." });
+        }
+
+        var taiKhoan = khachHang.TaiKhoan;
+        if (taiKhoan.TenDangNhap != model.Phone)
+        {
+            bool phoneExists = await _context.TaiKhoans.AnyAsync(t => t.TenDangNhap == model.Phone);
+            if (phoneExists)
+            {
+                return Conflict(new { success = false, message = "Số điện thoại mới đã tồn tại. Vui lòng chọn SĐT khác." });
+            }
+            taiKhoan.TenDangNhap = model.Phone;
+        }
+        khachHang.HoTen = model.FullName;
+        khachHang.Email = model.Email;
+        khachHang.SoDienThoai = model.Phone;
+        khachHang.DiaChi = model.Address;
+        if (taiKhoan.Email != model.Email)
+        {
+            taiKhoan.Email = model.Email;
+        }
+
+        try
+        {
+            await _context.SaveChangesAsync();
+
+            return Json(new
+            {
+                success = true,
+                message = "Cập nhật thông tin thành công!",
+                newFullName = khachHang.HoTen,
+                newUsername = taiKhoan.TenDangNhap
+            });
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(500, new { success = false, message = "Lỗi CSDL: " + ex.InnerException?.Message ?? ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = "Lỗi server: " + ex.Message });
+        }
+    }
+
+    // ==========================================================
+    // API (GET/POST) CHO TRANG LỊCH SỬ (HISTORY)
+    // ==========================================================
+
+    [HttpGet("GetHistoryData")]
+    public async Task<IActionResult> GetHistoryData([FromQuery] string username, [FromQuery] string status)
+    {
+        if (string.IsNullOrEmpty(username))
+        {
+            return BadRequest(new { success = false, message = "Không tìm thấy người dùng." });
+        }
+
+        var taiKhoan = await _context.TaiKhoans
+                                    .FirstOrDefaultAsync(t => t.TenDangNhap == username);
+
+        if (taiKhoan == null)
+        {
+            return NotFound(new { success = false, message = "Tài khoản không hợp lệ." });
+        }
+
+        IQueryable<DatBan> query = _context.DatBans
+                                        .Include(d => d.BanPhong)
+                                        .Include(d => d.KhachHang)
+                                        .Include(d => d.HoaDons)
+                                            .ThenInclude(h => h.TrangThai);
+
+        if (taiKhoan.VaiTro == "Customer")
+        {
+            var khachHang = await _context.KhachHangs
+                                        .FirstOrDefaultAsync(k => k.TaiKhoanId == taiKhoan.TaiKhoanId);
+
+            if (khachHang == null)
+            {
+                return NotFound(new { success = false, message = "Không tìm thấy thông tin khách hàng liên kết." });
+            }
+            query = query.Where(d => d.KhachHangId == khachHang.KhachHangId);
+        }
+        int? trangThaiId = null;
+        bool filterByDatBanStatus = false;
+        bool filterByDatBanHuy = false;
+
+        switch (status.ToLower())
+        {
+            case "chưa xác nhận":
+                filterByDatBanStatus = true;
+                break;
+            case "đã xác nhận":
+                trangThaiId = 2;
+                break;
+            case "đang phục vụ":
+                trangThaiId = 3;
+                break;
+            case "đã thanh toán":
+                trangThaiId = 4;
+                break;
+            case "đã hủy":
+                filterByDatBanHuy = true;
+                trangThaiId = 5;
+                break;
+            case "tất cả":
+            default:
+                break;
+        }
+        if (filterByDatBanHuy)
+        {
+            query = query.Where(d =>
+                d.TrangThai == "Đã hủy" ||
+                d.HoaDons.Any(h => h.TrangThaiId == trangThaiId.Value)
+            );
+        }
+        else if (trangThaiId.HasValue)
+        {
+            query = query.Where(d => d.HoaDons.Any(h => h.TrangThaiId == trangThaiId.Value));
+        }
+        else if (filterByDatBanStatus)
+        {
+            query = query.Where(d => d.TrangThai == "Chờ xác nhận");
+        }
+        var historyData = await query
+            .OrderByDescending(d => d.NgayDen)
+            .Select(d => new
+            {
+                datBanId = d.DatBanId,
+                ngayDen = d.NgayDen.ToString("dd/MM/yyyy"),
+                tenKhachHang = d.KhachHang.HoTen,
+                tenBanPhong = d.BanPhong != null ? d.BanPhong.TenBanPhong : "N/A",
+                soNguoi = d.SoNguoi,
+                trangThaiDatBan = d.TrangThai,
+                trangThaiHoaDon = d.HoaDons
+                                    .OrderByDescending(h => h.NgayLap)
+                                    .Select(h => h.TrangThai.TenTrangThai)
+                                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        return Json(new { success = true, list = historyData });
+    }
+
+    [HttpPost("CancelBooking")]
+    public async Task<IActionResult> CancelBooking([FromBody] CancelBookingRequest req)
+    {
+        if (string.IsNullOrEmpty(req.Username) || req.DatBanId <= 0)
+        {
+            return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ." });
+        }
+
+        var khachHang = await _context.KhachHangs.Include(k => k.TaiKhoan)
+            .FirstOrDefaultAsync(k => k.TaiKhoan != null && k.TaiKhoan.TenDangNhap == req.Username);
+
+        if (khachHang == null)
+        {
+            return Unauthorized(new { success = false, message = "Không tìm thấy người dùng." });
+        }
+
+        var datBan = await _context.DatBans
+            .Include(d => d.HoaDons)
+            .FirstOrDefaultAsync(d => d.DatBanId == req.DatBanId && d.KhachHangId == khachHang.KhachHangId);
+
+        if (datBan == null)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy đơn đặt bàn này." });
+        }
+
+        if (datBan.TrangThai != "Chờ xác nhận")
+        {
+            return BadRequest(new { success = false, message = "Không thể hủy đơn. Đơn đã được xác nhận hoặc xử lý." });
+        }
+
+        datBan.TrangThai = "Đã hủy";
+
+        var hoaDon = datBan.HoaDons.FirstOrDefault();
+        if (hoaDon != null)
+        {
+            hoaDon.TrangThaiId = 5; // ID 5 = Đã hủy
+            _context.HoaDons.Update(hoaDon);
+        }
+
+        _context.DatBans.Update(datBan);
+        await _context.SaveChangesAsync();
+
+        return Json(new { success = true, message = "Đã hủy đơn thành công." });
+    }
+
+    // ==========================================================
+    // API (GET) CHO TRANG VOUCHER (LOGIC GIẢ LẬP)
+    // ==========================================================
+
+    [HttpGet("GetUserVouchers")]
+    public async Task<IActionResult> GetUserVouchers([FromQuery] string username)
+    {
+        if (string.IsNullOrEmpty(username))
+        {
+            return BadRequest(new { success = false, message = "Không tìm thấy người dùng." });
+        }
+
+        var khachHang = await _context.KhachHangs
+                                    .Include(k => k.TaiKhoan)
+                                    .Include(k => k.HangThanhVien)
+                                    .FirstOrDefaultAsync(k => k.TaiKhoan != null && k.TaiKhoan.TenDangNhap == username);
+
+        if (khachHang == null)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy thông tin khách hàng." });
+        }
+
+        string hangThanhVien = khachHang.HangThanhVien?.TenHang ?? "Thường";
+        int diem = khachHang.DiemTichLuy;
+
+        var vouchers = new List<object>();
+        vouchers.Add(new
+        {
+            code = "WELCOME10",
+            value = 10,
+            type = "Phần trăm",
+            minOrder = 200000,
+            expiry = DateTime.Today.AddDays(30).ToString("dd/MM/yyyy"),
+            description = "Giảm 10% cho đơn hàng đầu tiên."
+        });
+        if (diem >= 1000)
+        {
+            vouchers.Add(new
+            {
+                code = "FREE_DRINK",
+                value = 1,
+                type = "Món ăn",
+                minOrder = 0,
+                expiry = DateTime.Today.AddMonths(3).ToString("dd/MM/yyyy"),
+                description = $"Tặng 1 đồ uống miễn phí (Hạng {hangThanhVien})."
+            });
+        }
+        if (hangThanhVien == "Kim cương")
+        {
+            vouchers.Add(new
+            {
+                code = "KIMCUONG20",
+                value = 20,
+                type = "Phần trăm",
+                minOrder = 500000,
+                expiry = DateTime.Today.AddYears(1).ToString("dd/MM/yyyy"),
+                description = "Giảm 20% đặc biệt cho khách hạng Kim cương."
+            });
+        }
+
+        return Json(new
+        {
+            success = true,
+            diemTichLuy = diem,
+            hangThanhVien = hangThanhVien,
+            list = vouchers
+        });
+    }
+
+    [HttpGet("HistoryDetail/{datBanId}")]
+    public async Task<IActionResult> HistoryDetail(int datBanId)
+    {
+        var datBan = await _context.DatBans
+            .Include(d => d.KhungGio)
+            .Include(d => d.BanPhong)
+            .Include(d => d.KhachHang)
+            .Include(d => d.HoaDons)
+                .ThenInclude(h => h.TrangThai)
+            .Include(d => d.HoaDons)
+                .ThenInclude(h => h.ChiTietHoaDons)
+                    .ThenInclude(ct => ct.MonAn)
+            .FirstOrDefaultAsync(d => d.DatBanId == datBanId);
+
+        if (datBan == null)
+        {
+            return NotFound("Không tìm thấy đơn đặt bàn.");
+        }
+
+        ViewBag.DanhSachBan = await _context.BanPhongs
+                                      .Include(b => b.LoaiBanPhong)
+                                      .OrderBy(b => b.BanPhongId)
+                                      .ToListAsync();
+
+        ViewBag.DanhSachMonAn = await _context.MonAns
+                                        .Where(m => m.TrangThai == "Còn bán")
+                                        .Include(m => m.DanhMuc)
+                                        .OrderBy(m => m.DanhMucId)
+                                        .ToListAsync();
+        return View(datBan);
+    }
+
+    private async Task<int> ResolveKhungGioId(string? timeSlot)
+    {
+        if (string.IsNullOrWhiteSpace(timeSlot)) return 0;
+        string key = timeSlot.Trim().ToLower();
+        if (key.Contains("trua") || key.Contains("trưa")) key = "Trưa";
+        else if (key.Contains("toi") || key.Contains("tối")) key = "Tối";
+        else return 0;
+        var khungGio = await _context.KhungGios
+            .FirstOrDefaultAsync(k => k.TenKhungGio.ToLower() == key.ToLower());
+        return khungGio?.KhungGioId ?? 0;
+    }
+    [HttpPost("UpdateBooking")]
+    public async Task<IActionResult> UpdateBooking([FromBody] UpdateBookingViewModel model)
+    {
+        // 1. Tìm đơn hàng
+        var datBan = await _context.DatBans
+            .Include(d => d.HoaDons)
+                .ThenInclude(h => h.ChiTietHoaDons)
+            .FirstOrDefaultAsync(d => d.DatBanId == model.DatBanId);
+
+        if (datBan == null || datBan.HoaDons.FirstOrDefault() == null)
+        {
+            return NotFound(new { success = false, message = "Không tìm thấy đơn hàng hoặc hóa đơn." });
+        }
+
+        var hoaDon = datBan.HoaDons.First();
+
+        // 2. Kiểm tra trạng thái
+        if (datBan.TrangThai != "Chờ xác nhận" && hoaDon.TrangThaiId != 1)
+        {
+            return BadRequest(new { success = false, message = "Không thể sửa đơn đã được xác nhận." });
+        }
+
+        // 3. Validation (Kiểm tra bàn, ngày, giờ...)
+        if (!DateOnly.TryParse(model.BookingDate, out DateOnly bookingDateOnly))
+            return Json(new { success = false, message = "Ngày đặt không hợp lệ" });
+
+        int khungGioId = await ResolveKhungGioId(model.TimeSlot);
+        if (khungGioId == 0)
+            return Json(new { success = false, message = "Khung giờ không hợp lệ" });
+
+        // (Bỏ qua kiểm tra bàn trống nếu bàn không thay đổi)
+        if (model.BanPhongId.HasValue && model.BanPhongId != datBan.BanPhongId)
+        {
+            var banDaChon = await _context.BanPhongs.FindAsync(model.BanPhongId.Value);
+            if (banDaChon == null || banDaChon.TrangThai != "Trống")
+            {
+                return Json(new { success = false, message = "Bàn bạn vừa chọn đã bị đặt." });
+            }
+        }
+
+        // 4. Bắt đầu Transaction
+        using (var transaction = await _context.Database.BeginTransactionAsync())
+        {
+            try
+            {
+                // 4a. Cập nhật DatBan
+                datBan.NgayDen = bookingDateOnly;
+                datBan.KhungGioId = khungGioId;
+                datBan.SoNguoi = model.GuestCount;
+                datBan.BanPhongId = model.BanPhongId;
+
+                // 4b. Xóa ChiTietHoaDon cũ
+                _context.ChiTietHoaDons.RemoveRange(hoaDon.ChiTietHoaDons);
+                await _context.SaveChangesAsync();
+
+                // 4c. Thêm ChiTietHoaDon mới và tính tổng tiền
+                decimal newTotal = 0;
+                var newItems = new List<ChiTietHoaDon>();
+
+                foreach (var item in model.Items)
+                {
+                    var thanhTien = item.DonGia * item.SoLuong;
+                    newItems.Add(new ChiTietHoaDon
+                    {
+                        HoaDonId = hoaDon.HoaDonId,
+                        MonAnId = item.MonAnId,
+                        SoLuong = item.SoLuong,
+                        DonGia = item.DonGia,
+                        ThanhTien = thanhTien
+                    });
+                    newTotal += thanhTien;
+                }
+                _context.ChiTietHoaDons.AddRange(newItems);
+
+                // 4d. Cập nhật HoaDon
+                hoaDon.TongTien = newTotal;
+                datBan.TongTienDuKien = newTotal; // Đồng bộ
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Json(new { success = true, message = "Cập nhật đơn hàng thành công!" });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { success = false, message = "Lỗi server: " + ex.Message });
+            }
+        }
+    }
+    // ==========================================================
+    // HÀM HỖ TRỢ (PRIVATE)
+    // ==========================================================
+
+    private string HashPassword(string password)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+            return Convert.ToBase64String(hashedBytes);
+        }
+    }
+}

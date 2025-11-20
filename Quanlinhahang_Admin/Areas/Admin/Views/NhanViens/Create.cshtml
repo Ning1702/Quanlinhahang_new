@@ -1,0 +1,119 @@
+@model Quanlinhahang_Admin.Models.NhanVien
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+
+<div class="container mt-5" style="max-width: 950px;">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            <h2 class="text-center fw-bold mb-4">Thêm nhân viên</h2>
+
+            <form method="post" id="createForm">
+
+                <!-- MÃ NHÂN VIÊN -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Mã nhân viên</label>
+                    <input asp-for="NhanVienID" class="form-control text-end" readonly />
+                </div>
+
+                <!-- HỌ TÊN + SĐT -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Họ tên</label>
+                        <input asp-for="HoTen" class="form-control" required />
+                        <span asp-validation-for="HoTen" class="text-danger"></span>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Số điện thoại</label>
+                        <input asp-for="SoDienThoai" class="form-control" required />
+                        <span asp-validation-for="SoDienThoai" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- USERNAME + MẬT KHẨU -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Tên đăng nhập</label>
+                        <input type="text" name="TenDangNhap" class="form-control" required />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Mật khẩu</label>
+                        <input type="text" name="MatKhau" class="form-control" required />
+                    </div>
+                </div>
+
+                <!-- CHỨC VỤ - NGÀY VÀO - TRẠNG THÁI -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Chức vụ</label>
+                        <select asp-for="ChucVu" class="form-control">
+                            <option>Quản lý</option>
+                            <option>Phục vụ</option>
+                            <option>Bếp</option>
+                            <option>Lễ tân</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Ngày vào</label>
+                        <input asp-for="NgayVaoLam" type="date" class="form-control" />
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Trạng thái</label>
+                        <select asp-for="TrangThai" class="form-control">
+                            <option>Đang làm</option>
+                            <option>Tạm nghỉ</option>
+                            <option>Nghỉ việc</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a asp-action="Index" class="btn btn-secondary px-4">Hủy</a>
+                    <button type="submit" class="btn btn-primary px-4">Lưu</button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        document.getElementById("createForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+            Swal.fire({
+                title: "Xác nhận?",
+                text: "Bạn có chắc muốn thêm nhân viên + tài khoản?",
+                icon: "question",
+                showCancelButton: true,
+                confirmButtonText: "Thêm",
+                cancelButtonText: "Hủy"
+            }).then(result => {
+                if (result.isConfirmed) e.target.submit();
+            });
+        });
+
+        @if (TempData["success"] != null)
+        {
+                <text>
+                    Swal.fire({ icon: 'success', title: '@TempData["success"]', timer: 1500, showConfirmButton: false });
+                </text>
+        }
+
+        @if (TempData["error"] != null)
+        {
+                <text>
+                    Swal.fire({ icon: 'error', title: '@TempData["error"]' });
+                </text>
+        }
+    </script>
+}

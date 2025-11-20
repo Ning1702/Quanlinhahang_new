@@ -1,0 +1,104 @@
+@model Quanlinhahang_Admin.Models.NhanVien
+
+@{
+    ViewData["Title"] = "Sửa nhân viên";
+}
+
+<div class="container mt-5" style="max-width: 950px;">
+    <h2 class="text-center fw-bold mb-4">Sửa nhân viên</h2>
+
+    <!-- FORM POST CHUẨN -->
+    <form method="post"
+          asp-area="Admin"
+          asp-controller="NhanViens"
+          asp-action="Edit"
+          asp-route-id="@Model.NhanVienID">
+        <!-- 🔥 DÒNG SỬA QUAN TRỌNG -->
+        <!-- GIỮ TRANG TÌM KIẾM -->
+        <input type="hidden" name="searchType" value="@ViewBag.SearchType" />
+        <input type="hidden" name="keyword" value="@ViewBag.Keyword" />
+
+        <input type="hidden" asp-for="NhanVienID" />
+
+        <!-- HỌ TÊN + SĐT -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="fw-semibold">Họ tên</label>
+                <input asp-for="HoTen" class="form-control" />
+                <span class="text-danger" asp-validation-for="HoTen"></span>
+            </div>
+
+            <div class="col-md-6">
+                <label class="fw-semibold">Số điện thoại</label>
+                <input asp-for="SoDienThoai" class="form-control" />
+                <span class="text-danger" asp-validation-for="SoDienThoai"></span>
+            </div>
+        </div>
+
+        <!-- CHỨC VỤ - NGÀY VÀO - TRẠNG THÁI -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="fw-semibold">Chức vụ</label>
+                <select asp-for="ChucVu" class="form-control">
+                    <option>Quản lý</option>
+                    <option>Phục vụ</option>
+                    <option>Bếp</option>
+                    <option>Lễ tân</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label class="fw-semibold">Ngày vào</label>
+                <input asp-for="NgayVaoLam" type="date" class="form-control" />
+            </div>
+
+            <div class="col-md-4">
+                <label class="fw-semibold">Trạng thái</label>
+                <select asp-for="TrangThai" class="form-control">
+                    <option>Đang làm</option>
+                    <option>Tạm nghỉ</option>
+                    <option>Nghỉ việc</option>
+                </select>
+            </div>
+        </div>
+
+        <hr />
+        <h4 class="fw-bold">Tài khoản đăng nhập</h4>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="fw-semibold">Tên đăng nhập</label>
+                <input type="text"
+                       name="TenDangNhap"
+                       value="@Model.TaiKhoan?.TenDangNhap"
+                       class="form-control"
+                       autocomplete="off" />
+                <span class="text-danger" asp-validation-for="TaiKhoan.TenDangNhap"></span>
+            </div>
+
+            <div class="col-md-6">
+                <label class="fw-semibold">Mật khẩu</label>
+                <input type="text"
+                       name="MatKhau"
+                       value="@Model.TaiKhoan?.MatKhauHash"
+                       class="form-control"
+                       autocomplete="off" />
+                <span class="text-danger" asp-validation-for="TaiKhoan.MatKhauHash"></span>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a asp-action="Index"
+               asp-route-searchType="@ViewBag.SearchType"
+               asp-route-keyword="@ViewBag.Keyword"
+               class="btn btn-secondary px-4">Hủy</a>
+
+            <button type="submit" class="btn btn-primary px-4">Lưu</button>
+        </div>
+
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
